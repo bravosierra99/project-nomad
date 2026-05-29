@@ -75,7 +75,12 @@ export class OllamaService {
         }
 
         this.openai = new OpenAI({
-          apiKey: 'nomad', // Required by SDK; not validated by Ollama/LM Studio/llama.cpp
+          // Required by the OpenAI SDK. Most local backends ignore it, but LM Studio
+          // (and any OpenAI-compatible server behind a reverse proxy with auth) will
+          // 401 anything that isn't a real key. Honor NOMAD_LLM_API_KEY when set so
+          // operators can opt in without code changes; fall back to the historical
+          // 'nomad' string otherwise so existing setups keep working.
+          apiKey: env.get('NOMAD_LLM_API_KEY') || 'nomad',
           baseURL: `${this.baseUrl}/v1`,
         })
       })()

@@ -61,4 +61,13 @@ export default await Env.create(new URL('../', import.meta.url), {
   |----------------------------------------------------------
   */
   NOMAD_API_URL: Env.schema.string.optional(),
+
+  /*
+  |----------------------------------------------------------
+  | API key forwarded to the remote OpenAI-compatible LLM backend
+  | (LM Studio, llama.cpp, vLLM, or any reverse-proxied Ollama).
+  | Leave unset for backends that don't require auth.
+  |----------------------------------------------------------
+  */
+  NOMAD_LLM_API_KEY: Env.schema.string.optional(),
 })
