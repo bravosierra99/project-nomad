@@ -74,13 +74,14 @@ export class OllamaService {
           this.baseUrl = ollamaUrl.trim().replace(/\/$/, '')
         }
 
+        // Resolve the API key the OpenAI SDK will send as `Authorization: Bearer ...`.
+        // Precedence: user-supplied KV setting > NOMAD_LLM_API_KEY env > the historical
+        // 'nomad' placeholder. Most local backends ignore the value, but LM Studio (and
+        // any OpenAI-compatible server behind a reverse proxy with auth) will 401
+        // anything that isn't a real key.
+        const customApiKey = (await KVStore.getValue('ai.remoteOllamaApiKey')) as string | null
         this.openai = new OpenAI({
-          // Required by the OpenAI SDK. Most local backends ignore it, but LM Studio
-          // (and any OpenAI-compatible server behind a reverse proxy with auth) will
-          // 401 anything that isn't a real key. Honor NOMAD_LLM_API_KEY when set so
-          // operators can opt in without code changes; fall back to the historical
-          // 'nomad' string otherwise so existing setups keep working.
-          apiKey: env.get('NOMAD_LLM_API_KEY') || 'nomad',
+          apiKey: customApiKey?.trim() || env.get('NOMAD_LLM_API_KEY') || 'nomad',
           baseURL: `${this.baseUrl}/v1`,
         })
       })()

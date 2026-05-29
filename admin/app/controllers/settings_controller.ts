@@ -64,6 +64,11 @@ export default class SettingsController {
     const chatSuggestionsEnabled = await KVStore.getValue('chat.suggestionsEnabled')
     const aiAssistantCustomName = await KVStore.getValue('ai.assistantCustomName')
     const remoteOllamaUrl = await KVStore.getValue('ai.remoteOllamaUrl')
+    // Intentionally read-only-from-the-page: we expose a boolean flag rather than
+    // round-tripping the API key value through the rendered inertia props, so the
+    // secret never lands in the page source. The UI lets the user replace it via
+    // an input field but never displays the existing value.
+    const remoteOllamaApiKey = await KVStore.getValue('ai.remoteOllamaApiKey')
     const ollamaFlashAttention = await KVStore.getValue('ai.ollamaFlashAttention')
     return inertia.render('settings/models', {
       models: {
@@ -73,6 +78,7 @@ export default class SettingsController {
           chatSuggestionsEnabled: chatSuggestionsEnabled ?? false,
           aiAssistantCustomName: aiAssistantCustomName ?? '',
           remoteOllamaUrl: remoteOllamaUrl ?? '',
+          remoteOllamaApiKeySet: Boolean(remoteOllamaApiKey && remoteOllamaApiKey.trim()),
           ollamaFlashAttention: ollamaFlashAttention ?? true,
         },
       },

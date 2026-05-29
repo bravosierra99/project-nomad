@@ -12,6 +12,7 @@ export const KV_STORE_SCHEMA = {
   'ai.assistantCustomName':     'string',
   'gpu.type':                   'string',
   'ai.remoteOllamaUrl':         'string',
+  'ai.remoteOllamaApiKey':      'string',
   'ai.ollamaFlashAttention':    'boolean',
   'ai.amdGpuAcceleration':      'boolean',
   'ai.amdHsaOverride':          'string',

@@ -58,11 +58,20 @@ class API {
     })()
   }
 
-  async configureRemoteOllama(remoteUrl: string | null): Promise<{ success: boolean; message: string }> {
+  async configureRemoteOllama(
+    remoteUrl: string | null,
+    apiKey?: string | null
+  ): Promise<{ success: boolean; message: string }> {
     return catchInternal(async () => {
+      const payload: { remoteUrl: string | null; apiKey?: string } = { remoteUrl }
+      // Only forward the API key when the caller is actively setting one. Omitting it
+      // tells the server to preserve whatever's stored (URL-only save).
+      if (apiKey && apiKey.trim()) {
+        payload.apiKey = apiKey.trim()
+      }
       const response = await this.client.post<{ success: boolean; message: string }>(
         '/ollama/configure-remote',
-        { remoteUrl }
+        payload
       )
       return response.data
     })()

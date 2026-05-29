@@ -26,7 +26,13 @@ export default function ModelsPage(props: {
   models: {
     availableModels: NomadOllamaModel[]
     installedModels: NomadInstalledModel[]
-    settings: { chatSuggestionsEnabled: boolean; aiAssistantCustomName: string; remoteOllamaUrl: string; ollamaFlashAttention: boolean }
+    settings: {
+      chatSuggestionsEnabled: boolean
+      aiAssistantCustomName: string
+      remoteOllamaUrl: string
+      remoteOllamaApiKeySet: boolean
+      ollamaFlashAttention: boolean
+    }
   }
 }) {
   const { aiAssistantName } = usePage<{ aiAssistantName: string }>().props
@@ -102,6 +108,7 @@ export default function ModelsPage(props: {
     props.models.settings.aiAssistantCustomName
   )
   const [remoteOllamaUrl, setRemoteOllamaUrl] = useState(props.models.settings.remoteOllamaUrl)
+  const [remoteOllamaApiKey, setRemoteOllamaApiKey] = useState('')
   const [remoteOllamaError, setRemoteOllamaError] = useState<string | null>(null)
   const [remoteOllamaSaving, setRemoteOllamaSaving] = useState(false)
 
@@ -109,9 +116,10 @@ export default function ModelsPage(props: {
     setRemoteOllamaError(null)
     setRemoteOllamaSaving(true)
     try {
-      const res = await api.configureRemoteOllama(remoteOllamaUrl || null)
+      const res = await api.configureRemoteOllama(remoteOllamaUrl || null, remoteOllamaApiKey || null)
       if (res?.success) {
         addNotification({ message: res.message, type: 'success' })
+        setRemoteOllamaApiKey('')
         router.reload()
       }
     } catch (error: any) {
@@ -129,6 +137,7 @@ export default function ModelsPage(props: {
       const res = await api.configureRemoteOllama(null)
       if (res?.success) {
         setRemoteOllamaUrl('')
+        setRemoteOllamaApiKey('')
         addNotification({ message: 'Remote Ollama configuration cleared.', type: 'success' })
         router.reload()
       }
@@ -401,7 +410,7 @@ export default function ModelsPage(props: {
               For remote Ollama instances, the host must be started with <code className="bg-surface-secondary px-1 rounded">OLLAMA_HOST=0.0.0.0</code>.
             </p>
             <div className="flex items-end gap-3">
-              <div className="flex-1">
+              <div className="flex-1 flex flex-col gap-3">
                 <Input
                   name="remoteOllamaUrl"
                   label="Remote Ollama/OpenAI API URL"
@@ -409,6 +418,22 @@ export default function ModelsPage(props: {
                   value={remoteOllamaUrl}
                   onChange={(e) => {
                     setRemoteOllamaUrl(e.target.value)
+                    setRemoteOllamaError(null)
+                  }}
+                />
+                <Input
+                  name="remoteOllamaApiKey"
+                  label="API Key (optional)"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder={
+                    props.models.settings.remoteOllamaApiKeySet
+                      ? 'API key configured. Type a new value to replace, or use Clear to remove.'
+                      : 'Required only if your backend has auth enabled (e.g. LM Studio API key).'
+                  }
+                  value={remoteOllamaApiKey}
+                  onChange={(e) => {
+                    setRemoteOllamaApiKey(e.target.value)
                     setRemoteOllamaError(null)
                   }}
                 />

@@ -220,6 +220,14 @@ export default class OllamaController {
 
   async configureRemote({ request, response }: HttpContext) {
     const remoteUrl: string | null = request.input('remoteUrl', null)
+    // apiKey is intentionally tri-state:
+    //   undefined → not in payload → preserve whatever's in KV (URL-only save)
+    //   empty string → not provided this round → also preserve (avoids accidental wipes)
+    //   non-empty string → replace stored key with this value
+    // Use the dedicated Clear button (no remoteUrl) to wipe both URL and key.
+    const apiKeyInput = request.input('apiKey')
+    const suppliedApiKey =
+      typeof apiKeyInput === 'string' && apiKeyInput.trim() !== '' ? apiKeyInput.trim() : null
 
     const ollamaService = await Service.query().where('service_name', SERVICE_NAMES.OLLAMA).first()
     if (!ollamaService) {
@@ -228,9 +236,11 @@ export default class OllamaController {
 
     // Clear path: null or empty URL removes remote config. If a local nomad_ollama container
     // still exists (user had previously installed AI Assistant locally), restart it and keep
-    // the service marked installed. Otherwise fall back to uninstalled.
+    // the service marked installed. Otherwise fall back to uninstalled. We also clear any
+    // stored API key so it doesn't linger pointing at nothing.
     if (!remoteUrl || remoteUrl.trim() === '') {
       await KVStore.clearValue('ai.remoteOllamaUrl')
+      await KVStore.clearValue('ai.remoteOllamaApiKey')
       const hasLocalContainer = await this._startLocalOllamaContainerIfExists()
       ollamaService.installed = hasLocalContainer
       ollamaService.installation_status = 'idle'
@@ -252,15 +262,34 @@ export default class OllamaController {
       })
     }
 
-    // Test connectivity via OpenAI-compatible /v1/models endpoint (works with Ollama, LM Studio, llama.cpp, etc.)
+    // Resolve the key we'll authenticate the connectivity test with. New value wins;
+    // otherwise reuse whatever's already stored so URL-only saves still validate
+    // against a server that requires auth.
+    const existingApiKey = (await KVStore.getValue('ai.remoteOllamaApiKey')) as string | null
+    const effectiveApiKey = suppliedApiKey || existingApiKey?.trim() || null
+
+    // Test connectivity via OpenAI-compatible /v1/models endpoint (works with Ollama, LM Studio,
+    // llama.cpp, etc.). Send the effective API key as a Bearer token so we surface a 401 before
+    // persisting bad credentials.
     try {
+      const testHeaders: Record<string, string> = {}
+      if (effectiveApiKey) {
+        testHeaders.Authorization = `Bearer ${effectiveApiKey}`
+      }
       const testResponse = await fetch(`${remoteUrl.replace(/\/$/, '')}/v1/models`, {
         signal: AbortSignal.timeout(5000),
+        headers: testHeaders,
       })
       if (!testResponse.ok) {
+        const authHint =
+          testResponse.status === 401 || testResponse.status === 403
+            ? effectiveApiKey
+              ? ' The server rejected the supplied API key.'
+              : ' The server requires an API key — set one in the API key field.'
+            : ''
         return response.status(400).send({
           success: false,
-          message: `Could not connect to ${remoteUrl} (HTTP ${testResponse.status}). Make sure the server is running and accessible. For Ollama, start it with OLLAMA_HOST=0.0.0.0.`,
+          message: `Could not connect to ${remoteUrl} (HTTP ${testResponse.status}).${authHint} Make sure the server is running and accessible. For Ollama, start it with OLLAMA_HOST=0.0.0.0.`,
         })
       }
     } catch (error) {
@@ -270,8 +299,12 @@ export default class OllamaController {
       })
     }
 
-    // Save remote URL and mark service as installed
+    // Save remote URL and mark service as installed. Only write the API key when the user
+    // supplied a new one this round — otherwise leave the stored value alone.
     await KVStore.setValue('ai.remoteOllamaUrl', remoteUrl.trim())
+    if (suppliedApiKey) {
+      await KVStore.setValue('ai.remoteOllamaApiKey', suppliedApiKey)
+    }
     ollamaService.installed = true
     ollamaService.installation_status = 'idle'
     await ollamaService.save()
